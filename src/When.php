@@ -40,6 +40,34 @@ class When extends \DateTime
 	    throw new \InvalidArgumentException("startDate: Accepts valid DateTime objects");
     }
 
+    // set start date to the first occurence
+   public function adjustStartDate()
+   {
+       if (!$this->startDate || $this->occursOn($this->startDate)) {
+           return $this;
+       }
+       // breakdown the date
+       list($year, $month, $day, $dayFromEndOfMonth, $week, $weekDay, $dayOfWeek, $dayOfWeekAbr, $yearDay, $yearDayNeg, $leapYear) = self::getDateComponents($this->startDate);
+       // move start forwards until we have a match
+       if (isset($this->bydays) || isset($this->bymonthdays) || isset($this->byyeardays)) {
+           while (!$this->occursOn($this->startDate) && $this->startDate <= $this->until) {
+               $this->startDate->add(new \DateInterval('P1D'));
+               list($year, $month, $day, $dayFromEndOfMonth, $week, $weekDay, $dayOfWeek, $dayOfWeekAbr, $yearDay, $yearDayNeg, $leapYear) = self::getDateComponents($this->startDate);
+           }
+       } else if (isset($this->byweeknos)) {
+           while (!$this->occursOn($this->startDate) && $this->startDate <= $this->until) {
+               $this->startDate->add(new \DateInterval('P1W'));
+               list($year, $month, $day, $dayFromEndOfMonth, $week, $weekDay, $dayOfWeek, $dayOfWeekAbr, $yearDay, $yearDayNeg, $leapYear) = self::getDateComponents($this->startDate);
+           }
+       } else if (isset($this->bymonths)) {
+           while (!$this->occursOn($this->startDate) && $this->startDate <= $this->until) {
+               $this->startDate->add(new \DateInterval('P1M'));
+               list($year, $month, $day, $dayFromEndOfMonth, $week, $weekDay, $dayOfWeek, $dayOfWeekAbr, $yearDay, $yearDayNeg, $leapYear) = self::getDateComponents($this->startDate);
+           }
+       }
+       return $this;
+   }
+
     public function freq($frequency)
     {
         if (Valid::freq($frequency))
@@ -380,6 +408,8 @@ class When extends \DateTime
 
     public function generateOccurrences()
     {
+        $this->adjustStartDate();
+
         self::prepareDateElements();
 
         $count = 0;
@@ -810,6 +840,32 @@ class When extends \DateTime
         }
 
         return $_days;
+    }
+
+    protected static function getDateComponents(\DateTime $date)
+    {
+        $day = $date->format('j');
+        $leapYear = (int)$date->format('L');
+        $yearDay = $date->format('z') + 1;
+        $yearDayNeg = -366 + (int)$yearDay;
+        if ($leapYear) {
+            $yearDayNeg = -367 + (int)$yearDay;
+        }
+        $dayOfWeek = $date->format('l');
+        $dayOfWeekAbr = strtolower(substr($dayOfWeek, 0, 2));
+        return array(
+            $date->format('Y'),
+            $date->format('n'),
+            $day,
+            -((int)$date->format('t') + 1 - (int)$day),
+            $date->format('W'),
+            strtolower($date->format('D')),
+            $dayOfWeek,
+            $dayOfWeekAbr,
+            $yearDay,
+            $yearDayNeg,
+            $leapYear,
+        );
     }
 }
 
